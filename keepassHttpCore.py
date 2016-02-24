@@ -1,4 +1,5 @@
 import jsonKey
+import entryKey
 import requestType
 import random
 from crypto import AESObj
@@ -14,6 +15,7 @@ class KeepassHttpCore:
         }
         self.keyMap = {} # client_id -> key
         self.aes = None
+        self.resp_aes = None # Danger!!! concurrent problem
 
     def getErrMsg(self):
         return self.errMsg
@@ -69,9 +71,9 @@ class KeepassHttpCore:
             key = self.aes.get_key()
         # use key to encrypt nonce
         nonce = AESObj.gen_nonce()
-        aes = AESObj(key, nonce)
+        self.resp_aes = AESObj(key, nonce)
         #print nonce
-        nonce_encrypt = aes.encrypt(nonce)
+        nonce_encrypt = self.resp_aes.encrypt(nonce)
         # set encrypt result
         output_dict[jsonKey.NONCE] = nonce
         output_dict[jsonKey.VERIFIER] = nonce_encrypt 
@@ -122,6 +124,16 @@ class KeepassHttpCore:
             # auth fail
             return True
         else:
+            #output_dict[jsonKey.SUCCESS] = False 
             output_dict[jsonKey.SUCCESS] = True
-            output_dict[jsonKey.COUNT] = 1
+            entry = {
+                entryKey.LOGIN: self.resp_aes.encrypt("hehe"),
+                entryKey.PASSWORD: self.resp_aes.encrypt("123456"),
+                entryKey.NAME: self.resp_aes.encrypt("web1"),
+                entryKey.UUID: self.resp_aes.encrypt("342432423")
+            }
+            #output_dict[jsonKey.COUNT] = 1
+            client_id = input_dict.get(jsonKey.ID, None)
+            output_dict[jsonKey.ID] = client_id
+            output_dict[jsonKey.ENTRIES] = [entry]
             return True
